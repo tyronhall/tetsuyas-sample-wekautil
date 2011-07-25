@@ -5,8 +5,10 @@ import java.beans.IntrospectionException;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
@@ -36,7 +38,8 @@ import net.tetsuyas.wekautil.annotations.Weight;
 
 public abstract class WekaUtil<T> {
 //	private static final String ClassifiedClassAttribute = "classifiedClassAttribute";
-	public static List<Class> numericClasses = Arrays.asList(new Class[]{int.class,double.class,Integer.class,Double.class});
+	public static List<Class> numericClasses = Arrays.asList(
+			new Class[]{int.class,double.class,Integer.class,Double.class});
 	private static Logger logger = Logger.getLogger(WekaUtil.class);
 
 	Class<?> clazz ;
@@ -79,17 +82,17 @@ public abstract class WekaUtil<T> {
 				annotations = pd.getReadMethod().getAnnotations();
 
 //				サブクラスごとに特殊なAttributeを登録する
-				if(registSubClassPropertyDescriptor(pd,annotations)){
+				if(registSubClassPropertyDescriptor(pd)){
 					continue ;
 				}
 				if(usingAttributeAnnotationProperty){
 					/**Attributeアノテーションを持っている要素のみを対象にする。*/
-					if( ! hasAnnotation(UsingAttribute.class, annotations)){
+					if( ! hasAnnotation(UsingAttribute.class,pd)){
 						continue;
 					}
 				}else{
 					/**NotAttributeアノテーションを持っている要素のみを対象にする。*/
-					if(hasAnnotation(NotAttrubute.class, annotations )){
+					if(hasAnnotation(NotAttrubute.class,pd)){
 						continue;
 					}
 				}
@@ -107,7 +110,7 @@ public abstract class WekaUtil<T> {
 	}
 
 	/**サブクラスでオーバーライドする。*/
-	abstract boolean registSubClassPropertyDescriptor(PropertyDescriptor pd,Annotation[] annotations);
+	abstract boolean registSubClassPropertyDescriptor(PropertyDescriptor pd);
 	abstract void registSubClassAttributeFastVector();
 	abstract public Instances getInstances() ;
 
@@ -208,14 +211,63 @@ public abstract class WekaUtil<T> {
 		return instance;
 	}
 
-	boolean hasAnnotation(Class<? extends Annotation> checkAnnotation,Annotation[] annotations){
+
+
+	boolean hasAnnotation(Class<? extends Annotation> checkAnnotation,PropertyDescriptor pd){
+		Field field  = getDecrearedField(pd);
+		if(field!=null && hasAnnotation(checkAnnotation, field.getAnnotations())){
+				return true;
+		}
+
+		Method readMethod = pd.getReadMethod();
+		if(readMethod!=null && hasAnnotation(checkAnnotation, readMethod.getAnnotations())){
+			return true;
+		}
+
+		Method writeMethod = pd.getWriteMethod();
+		if(writeMethod!=null && hasAnnotation(checkAnnotation, writeMethod.getAnnotations())){
+			return true;
+		}
+
+		return false;
+	}
+
+	private boolean hasAnnotation(Class<? extends Annotation> checkAnnotation,Annotation[] annotations){
 		for(Annotation anno :annotations){
 			if(anno.annotationType().equals(checkAnnotation)) return true;
 		}
 		return false;
 	}
 
-	 boolean isNumericValue(PropertyDescriptor pd){
+	private Field getDecrearedField(PropertyDescriptor pd){
+		for(Field field:getAllDeclaredInstanceFields()){
+			if(field.getName().equals(pd.getName())
+					&& pd.getPropertyType().equals(field.getType())) return field;
+		}
+		return null;
+	}
+
+	private Set<Field> getAllDeclaredInstanceFields(){
+		Set<Field> fields = new HashSet<Field>();
+		Class<?> tempClass =clazz;
+		do{
+			fields.addAll(Arrays.asList(tempClass.getDeclaredFields()));
+		}while(
+			(tempClass = tempClass.getSuperclass())!=null
+				&&	!tempClass.isInterface()
+				&&	!tempClass.equals(Object.class)
+			);
+		Set<Field> res = new HashSet<Field>();
+// staticなフィールドを排除する。
+		for(Field f:fields){
+			if(!Modifier.isStatic(f.getModifiers())){
+				res.add(f);
+			}
+		}
+		return res;
+	}
+
+	boolean isNumericValue(PropertyDescriptor pd){
 		return numericClasses.contains(pd.getReadMethod().getReturnType());
 	}
 
@@ -233,6 +285,4 @@ public abstract class WekaUtil<T> {
 
 
 }
-
-
 
