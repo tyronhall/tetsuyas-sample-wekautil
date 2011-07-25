@@ -9,6 +9,7 @@ import org.apache.log4j.Logger;
 
 import net.tetsuyas.wekautil.annotations.ClassifiedClassAttribute;
 import net.tetsuyas.wekautil.annotations.ClusterResultAttribute;
+import net.tetsuyas.wekautil.annotations.TrainingClassAttribute;
 
 import weka.classifiers.Classifier;
 import weka.classifiers.Evaluation;
@@ -21,40 +22,13 @@ public class ClassifierUtil<T> extends WekaUtil<T> {
 
 	Classifier classifier;
 	Evaluation evaluation;
+	PropertyDescriptor traingingClassPropertyDescriptor;
 	PropertyDescriptor classifiedClassPropertyDescriptor;
-	Attribute classifiedClassAttribute;
+	Attribute trainingClassAttribute;
+//	Attribute classifiedClassAttribute;
 	private static final boolean isLearning = true;
 	private static final boolean isNOTLearning = false;
-	/**
-	 * 分類結果となる属性を設定する。
-	 * */
-	private void addClassAttributeValue(T obj,Instance instance){
-		try {
-			Object classValueObj = classifiedClassPropertyDescriptor.getReadMethod().invoke(obj, null);
-			Attribute classAttribute= attributeMap.get(classifiedClassPropertyDescriptor);
-			/** nominal で　値が含まれない場合は何も入れない。*/
-			if(classAttribute.isNominal()){
-				if(!hasAttributeValue(classAttribute, classValueObj)){
-					return;
-				}
-			}
-			if(classValueObj!=null){
-				if(isNumericValue(classifiedClassPropertyDescriptor)
-//						Classes.contains(wekaClassPropertyDescriptor.getReadMethod().getClass().getName())
-						){
-					instance.setValue(classAttribute,Double.valueOf(classValueObj.toString()));
-				}else{
-					instance.setValue(classAttribute,classValueObj.toString());
-				}
-			}
-		} catch (IllegalArgumentException e) {
-			e.printStackTrace();
-		} catch (IllegalAccessException e) {
-			e.printStackTrace();
-		} catch (InvocationTargetException e) {
-			e.printStackTrace();
-		}
-	}
+
 
 	/**
 	 * インスタンスのまま分類するメソッド<br/>
@@ -71,8 +45,8 @@ public class ClassifierUtil<T> extends WekaUtil<T> {
 			double result = getClassifier().classifyInstance(classifyInstance);
 
 			Object resultValueObj  =null;
-			if(classifiedClassAttribute.isNominal()){
-				resultValueObj = classifiedClassAttribute.value((int)result);
+			if(trainingClassAttribute.isNominal()){
+				resultValueObj = trainingClassAttribute.value((int)result);
 			}else{
 				if(classifiedClassPropertyDescriptor.getReadMethod().getReturnType().equals(double.class)
 					|| classifiedClassPropertyDescriptor.getReadMethod().getReturnType().equals(Double.class)
@@ -122,15 +96,22 @@ public class ClassifierUtil<T> extends WekaUtil<T> {
 	}
 
 	@Override
-	boolean registSubClassPropertyDescriptor(PropertyDescriptor pd,Annotation[] annotations) {
-		if(hasAnnotation(ClassifiedClassAttribute.class, annotations)
+	boolean registSubClassPropertyDescriptor(PropertyDescriptor pd) {
+
+		if(hasAnnotation(TrainingClassAttribute.class, pd)
+				|| (trainingClassAttribute!=null && pd.getName().toLowerCase()
+						.equals(TrainingClassAttribute.class.getSimpleName().toLowerCase()))){
+				traingingClassPropertyDescriptor = pd;
+				return true;
+		}
+
+		if(hasAnnotation(ClassifiedClassAttribute.class, pd)
 				|| (classifiedClassPropertyDescriptor!=null && pd.getName().toLowerCase()
 						.equals(ClassifiedClassAttribute.class.getSimpleName().toLowerCase()))){
-			
 				classifiedClassPropertyDescriptor = pd;
 				return true;
 		}
-		if(hasAnnotation(ClusterResultAttribute.class, annotations)){
+		if(hasAnnotation(ClusterResultAttribute.class, pd)){
 			return true;
 		}
 		return false;
@@ -138,15 +119,24 @@ public class ClassifierUtil<T> extends WekaUtil<T> {
 
 	@Override
 	void registSubClassAttributeFastVector() {
-		if(classifiedClassPropertyDescriptor ==null) logger.error("classifiedClassPropertyDescriptor");
-		if(isNumericValue(classifiedClassPropertyDescriptor)){
-			 classifiedClassAttribute =new Attribute(classifiedClassPropertyDescriptor.getName());
-		}else{
-			classifiedClassAttribute = createAttributeNominalValues(classifiedClassPropertyDescriptor);
-		}
 
-		attributeFastVector.addElement(classifiedClassAttribute);
-		attributeMap.put(classifiedClassPropertyDescriptor, classifiedClassAttribute);
+		if(traingingClassPropertyDescriptor ==null) logger.error("trainingClassPropertyDescriptor");
+		if(isNumericValue(traingingClassPropertyDescriptor)){
+			 trainingClassAttribute =new Attribute(traingingClassPropertyDescriptor.getName());
+		}else{
+			trainingClassAttribute = createAttributeNominalValues(traingingClassPropertyDescriptor);
+		}
+		attributeFastVector.addElement(trainingClassAttribute);
+		attributeMap.put(traingingClassPropertyDescriptor, trainingClassAttribute);
+
+//		if(classifiedClassPropertyDescriptor ==null) logger.error("classifiedClassPropertyDescriptor");
+//		if(isNumericValue(classifiedClassPropertyDescriptor)){
+//			 classifiedClassAttribute =new Attribute(classifiedClassPropertyDescriptor.getName());
+//		}else{
+//			classifiedClassAttribute = createAttributeNominalValues(classifiedClassPropertyDescriptor);
+//		}
+//		attributeFastVector.addElement(classifiedClassAttribute);
+//		attributeMap.put(classifiedClassPropertyDescriptor, classifiedClassAttribute);
 	}
 	/**
 	 * 学習用Instanceを生成する
@@ -155,6 +145,37 @@ public class ClassifierUtil<T> extends WekaUtil<T> {
 		Instance  instance = super.createInstance(obj, attributeFastVector.size());
 		addClassAttributeValue(obj,instance);
 		return instance;
+	}
+
+	/**
+	 * 分類結果となる属性を設定する。
+	 * */
+	private void addClassAttributeValue(T obj,Instance instance){
+		try {
+			Object classValueObj = traingingClassPropertyDescriptor.getReadMethod().invoke(obj, null);
+			Attribute classAttribute= attributeMap.get(traingingClassPropertyDescriptor);
+			/** nominal で　値が含まれない場合は何も入れない。*/
+			if(classAttribute.isNominal()){
+				if(!hasAttributeValue(classAttribute, classValueObj)){
+					return;
+				}
+			}
+			if(classValueObj!=null){
+				if(isNumericValue(traingingClassPropertyDescriptor)
+//						Classes.contains(wekaClassPropertyDescriptor.getReadMethod().getClass().getName())
+						){
+					instance.setValue(classAttribute,Double.valueOf(classValueObj.toString()));
+				}else{
+					instance.setValue(classAttribute,classValueObj.toString());
+				}
+			}
+		} catch (IllegalArgumentException e) {
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			e.printStackTrace();
+		} catch (InvocationTargetException e) {
+			e.printStackTrace();
+		}
 	}
 
 	/**分類用Instanceを生成する*/

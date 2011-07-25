@@ -20,16 +20,14 @@ public class ClusterUtil<T> extends WekaUtil<T> {
 		getClusterer();
 	}
 
-
 	private static Logger logger = Logger.getLogger(ClusterUtil.class);
-
 	Clusterer clusterer;
 	PropertyDescriptor clusterResultPropertyDescriptor;
 	Attribute clusterResultAttribute;
 
 	@Override
-	boolean registSubClassPropertyDescriptor(PropertyDescriptor pd,Annotation[] annotations) {
-		if(hasAnnotation(ClusterResultAttribute.class, annotations)
+	boolean registSubClassPropertyDescriptor(PropertyDescriptor pd) {
+		if(hasAnnotation(ClusterResultAttribute.class, pd)
 				|| (clusterResultPropertyDescriptor!=null && pd.getName().toLowerCase()
 					.equals(ClusterResultAttribute.class.getSimpleName().toLowerCase()))){
 
@@ -44,7 +42,7 @@ public class ClusterUtil<T> extends WekaUtil<T> {
 		}
 
 		/**当該クラスがClassifierにも対応している場合、当該アノテーションを持つプロパティは登録しない。*/
-		if(hasAnnotation(ClassifiedClassAttribute.class, annotations)){
+		if(hasAnnotation(ClassifiedClassAttribute.class, pd)){
 			return true;
 		}
 
